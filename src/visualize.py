@@ -70,6 +70,7 @@ def find_actual_vias_and_connections(route):
 
 def visualize_routing(output_file, input_file):
     # Read grid dimensions and obstacles from input file
+    
     with open(input_file, 'r') as f:
         width, height, bend_penalty, via_penalty = map(int, f.readline().strip().split(','))
         obstacles = []
@@ -124,7 +125,10 @@ def visualize_routing(output_file, input_file):
 
     # Colors for different nets
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-    
+    longest_route_length = 0  # Initialize variable for longest route length
+    total_wire_length = 0  # Initialize variable for total wire length
+    total_vias = 0  # Initialize variable for total vias
+    total_cost = 0  # Initialize variable for total cost
     # Information panel setup
     ax_info.axis('off')
     info_text = [
@@ -136,6 +140,7 @@ def visualize_routing(output_file, input_file):
         "\nNets:",
     ]
     
+
     # Plot nets
     for i, (net_name, route) in enumerate(nets_routes.items()):
         color = colors[i % len(colors)]
@@ -157,11 +162,14 @@ def visualize_routing(output_file, input_file):
             next_pos = route[j + 1]
             
             if curr_pos[0] == next_pos[0]:  # Same layer
-                path_cost += 1  # Basic move cost
-                # Add bend penalty if direction violates layer preference
-                is_horizontal = (next_pos[1] - curr_pos[1]) != 0
-                if (curr_pos[0] == 0 and not is_horizontal) or (curr_pos[0] == 1 and is_horizontal):
-                    path_cost += bend_penalty
+                dx = abs(curr_pos[1] - next_pos[1])
+                dy = abs(curr_pos[2] - next_pos[2])
+                if dx + dy == 1:  # Points are neighbors
+                    path_cost += 1  # Basic move cost
+                    # Add bend penalty if direction violates layer preference
+                    is_horizontal = (next_pos[1] - curr_pos[1]) != 0
+                    if (curr_pos[0] == 0 and not is_horizontal) or (curr_pos[0] == 1 and is_horizontal):
+                        path_cost += bend_penalty
         
         # Add costs for additional connections
         for conn in additional_connections:
@@ -186,19 +194,22 @@ def visualize_routing(output_file, input_file):
             
             # Same layer connection
             if curr_pos[0] == next_pos[0]:
-                ax = ax0 if curr_pos[0] == 0 else ax1
-                ax.plot([curr_pos[1], next_pos[1]], 
+                dx = abs(curr_pos[1] - next_pos[1])
+                dy = abs(curr_pos[2] - next_pos[2])
+                if dx + dy == 1:  # Points are neighbors
+                    ax = ax0 if curr_pos[0] == 0 else ax1
+                    ax.plot([curr_pos[1], next_pos[1]], 
                        [curr_pos[2], next_pos[2]], 
                        color=color, linewidth=2, 
                        label=net_name if j == 0 else "")
                 
-                # Direction arrows
-                if curr_pos != next_pos:
-                    mid_x = (curr_pos[1] + next_pos[1]) / 2
-                    mid_y = (curr_pos[2] + next_pos[2]) / 2
-                    dx = next_pos[1] - curr_pos[1]
-                    dy = next_pos[2] - curr_pos[2]
-                    ax.arrow(mid_x - dx/3, mid_y - dy/3, dx/6, dy/6, 
+                    # Direction arrows
+                    if curr_pos != next_pos:
+                        mid_x = (curr_pos[1] + next_pos[1]) / 2
+                        mid_y = (curr_pos[2] + next_pos[2]) / 2
+                        dx = next_pos[1] - curr_pos[1]
+                        dy = next_pos[2] - curr_pos[2]
+                        ax.arrow(mid_x - dx/3, mid_y - dy/3, dx/6, dy/6, 
                             head_width=0.15, head_length=0.15, 
                             fc=color, ec=color, 
                             alpha=0.8,
@@ -263,6 +274,22 @@ def visualize_routing(output_file, input_file):
                     ha='center', va='bottom', fontsize=7,
                     fontweight='bold', alpha=1.0)
 
+        # Update longest route length
+        route_length = len(route)
+        longest_route_length = max(longest_route_length, route_length)
+        
+        # Update total wire length
+        total_wire_length += route_length
+        
+        # Count vias
+        total_vias += len(actual_vias)
+        
+        # Add path cost to total cost
+        total_cost += path_cost  # Add the path cost for the current net
+
+
+        
+
     # Add single legend for each subplot
     handles0, labels0 = ax0.get_legend_handles_labels()
     handles1, labels1 = ax1.get_legend_handles_labels()
@@ -288,13 +315,28 @@ def visualize_routing(output_file, input_file):
 
     ax0.legend(handles0_unique, labels0_unique, bbox_to_anchor=(0.5, -0.1), loc='upper center', ncol=2)
     ax1.legend(handles1_unique, labels1_unique, bbox_to_anchor=(0.5, -0.1), loc='upper center', ncol=2)
-    
+
+    info_text.append(f"\nLongest Route Length: {longest_route_length}")
+    info_text.append(f"Total Wire Length: {total_wire_length}")
+    info_text.append(f"Total Number of Vias: {total_vias}")
+    info_text.append(f"Total Cost: {total_cost}")
+
+    num_nets = len(nets_routes)
+    if num_nets <= 3:
+        font_size = 9
+    elif num_nets <= 4:
+        font_size = 8
+    elif num_nets <= 7:
+        font_size = 6
+    else:
+        font_size = 5
+
     # Add information panel text
     ax_info.text(0, 0.95, '\n'.join(info_text), 
                 verticalalignment='top', 
                 horizontalalignment='left',
-                fontfamily='monospace')
-    
+                fontfamily='monospace',
+                fontsize=font_size)  # Use dynamic font size
     # Add legend for symbols
     symbol_info = [
         "\nSymbol Legend:",
@@ -314,6 +356,14 @@ def visualize_routing(output_file, input_file):
                 horizontalalignment='left',
                 fontfamily='monospace')
     
+
+    # Print the results
+    print(f"Longest route length: {longest_route_length}")
+    print(f"Total wire length: {total_wire_length}")
+    print(f"Total number of vias: {total_vias}")
+    print(f"Total cost: {total_cost}")  # Print the total cost
+
     plt.tight_layout()
     plt.show()
+
 

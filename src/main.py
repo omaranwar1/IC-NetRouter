@@ -2,7 +2,17 @@ from router import MazeRouter
 from visualize import visualize_routing
 
 def main():
-    input_file = 'test_cases/case_ripup_test.txt'
+    # Test files:
+    # case1_simple_2pin.txt
+    # case2_multipin.txt
+    # case3_obstacles.txt
+    # case4_layer_preference.txt
+    # case5_high_density.txt
+    # case6_penalties.txt
+    # case7_boundary.txt
+    # case8_complex.txt
+    # case_ripup_test.txt
+    input_file = 'test_cases/case3_obstacles.txt'
     output_file = 'output.txt'  # Replace with the path for your output file
 
     # Initialize MazeRouter with the input file

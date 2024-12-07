@@ -145,38 +145,30 @@ class Grid:
 #         layer, x, y = pos
 #         neighbors = []
         
-#         # Determine previous direction
-#         prev_direction = None
-#         if prev_pos:
-#             dx = x - prev_pos[1]
-#             dy = y - prev_pos[2]
-#             prev_direction = 'horizontal' if dx != 0 else 'vertical'
-        
-#         # Same layer movements
-#         moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+#         # Prioritize preferred directions based on layer
+#         if layer == 0:  # M0 prefers horizontal
+#             moves = [(1, 0), (-1, 0), (0, 1), (0, -1)]  # Horizontal first
+#         else:  # M1 prefers vertical
+#             moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # Vertical first
+#         
 #         for dx, dy in moves:
 #             new_x, new_y = x + dx, y + dy
 #             if self.is_valid_move(layer, new_x, new_y, net_name):
-#                 # Calculate cost based on preferred directions
 #                 is_horizontal = dx != 0
 #                 cost = 1
-                
-#                 # Add bend penalty if changing direction
-#                 if prev_direction:
-#                     current_direction = 'horizontal' if dx != 0 else 'vertical'
-#                     if current_direction != prev_direction:
-#                         cost += self.bend_penalty
-                
-#                 # Add penalty for non-preferred direction
-#                 if (layer == 0 and not is_horizontal) or (layer == 1 and is_horizontal):
+#                 
+#                 # Only add penalty for non-preferred direction movements
+#                 # Remove the direction change penalty completely
+#                 if ((layer == 0 and not is_horizontal) or 
+#                     (layer == 1 and is_horizontal)):
 #                     cost += self.bend_penalty
-                
+#                 
 #                 neighbors.append((layer, new_x, new_y, cost))
-        
+#         
 #         # Via movements (layer changes)
 #         other_layer = 1 - layer
 #         if self.is_valid_move(other_layer, x, y, net_name):
 #             neighbors.append((other_layer, x, y, self.via_penalty))
-        
+#         
 #         return neighbors
-    
+

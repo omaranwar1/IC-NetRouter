@@ -40,36 +40,74 @@ class MazeRouter:
                    print(f"Net added: {name}, Pins={[(pin.layer, pin.x, pin.y) for pin in pins]}")
   
    def route_all_nets(self, max_attempts=100):
-       """Route all nets with complete reset and shuffle on failure"""
-       for attempt in range(max_attempts):
-           print(f"\nRouting attempt {attempt + 1}/{max_attempts}")
-           
-           # Clear all existing routes at the start of each attempt
-           for net in self.nets:
-               self.grid.clear_path(net.name)
-               net.clear_route()
-           
-           # Shuffle nets for this attempt
-           nets_to_route = self.nets.copy()
-           random.shuffle(nets_to_route)
-           
-           # Try to route all nets in the new order
-           success = True
-           for net in nets_to_route:
-               print(f"Routing net: {net.name}")
-               if not self.route_net(net):
-                   print(f"Failed to route net: {net.name}")
-                   success = False
-                   break
-               print(f"Net {net.name} routed successfully.")
-           
-           if success:
-               print("All nets routed successfully!")
-               return True
-       
-       print("Routing failed after maximum attempts.")
-       return False
-  
+        """Route all nets with localized ripup and reroute on failure"""
+        for attempt in range(max_attempts):
+            print(f"\nRouting attempt {attempt + 1}/{max_attempts}")
+            
+            # Start with fresh routing for first attempt
+            if attempt == 0:
+                for net in self.nets:
+                    net.clear_route()
+                    self.grid.clear_path(net.name)
+            
+            # Try to route all unrouted nets
+            nets_to_route = [net for net in self.nets if not net.route]
+            random.shuffle(nets_to_route)
+            
+            success = True
+            for net in nets_to_route:
+                print(f"Routing net: {net.name}")
+                if not self.route_net(net):
+                    print(f"Failed to route net: {net.name}")
+                    # Get the bounding box of the failed route attempt
+                    bbox = self._get_routing_bbox(net.pins)
+                    # Clear all routes in the congestion box
+                    self._clear_routes_in_bbox(bbox)
+                    success = False
+                    break
+                print(f"Net {net.name} routed successfully.")
+            
+            if success:
+                print("All nets routed successfully!")
+                return True
+        
+        print("Routing failed after maximum attempts.")
+        return False
+
+   def _get_routing_bbox(self, pins, padding=2):
+        """Calculate bounding box around pins with padding"""
+        min_x = min(pin.x for pin in pins)
+        max_x = max(pin.x for pin in pins)
+        min_y = min(pin.y for pin in pins)
+        max_y = max(pin.y for pin in pins)
+        
+        # Add padding and clamp to grid boundaries
+        min_x = max(0, min_x - padding)
+        min_y = max(0, min_y - padding)
+        max_x = min(self.grid.width - 1, max_x + padding)
+        max_y = min(self.grid.height - 1, max_y + padding)
+        
+        return (min_x, min_y, max_x, max_y)
+
+   def _clear_routes_in_bbox(self, bbox):
+        """Clear all net routes that intersect with the given bounding box"""
+        min_x, min_y, max_x, max_y = bbox
+        affected_nets = set()
+        
+        # Find all nets that pass through the bbox
+        for net in self.nets:
+            if net.route:
+                for layer, x, y in net.route:
+                    if min_x <= x <= max_x and min_y <= y <= max_y:
+                        affected_nets.add(net)
+                        break
+        
+        # Clear the affected nets
+        for net in affected_nets:
+            print(f"Clearing net {net.name} in congestion area")
+            self.grid.clear_path(net.name)
+            net.clear_route()
+    
    def route_net(self, net):
        """Route a multi-pin net using Steiner tree approach"""
        if len(net.pins) < 2:
